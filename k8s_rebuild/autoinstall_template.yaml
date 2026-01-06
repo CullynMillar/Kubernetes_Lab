@@ -1,0 +1,78 @@
+#cloud-config
+autoinstall:
+    version: 1
+    identity:
+        realname: "<insert named user here>"
+        username: <insert user here>
+        password: "<insert hashed password here>"
+        hostname: test-linux-auto-install
+    storage: # Specifies the partition layout to use; In this example, we'll configure a drive with LVM with full-disk encryption
+            # WARNING: THIS ERASES THE ENTIRE DISK!
+        layout:
+            name: lvm # DEFAULT
+            sizing-policy: all # Use the whole disk
+            match: # Specifies which disk to use, based on certain characteristics (not all of these need to be specified). This example uses the largest disk in the system, which is the default behaviour.
+    #                model:
+    #                vendor:
+    #                path:
+    #                id_path:
+    #                devpath:
+    #                serial:
+    #                ssd:  # Can be either true or false
+                size: largest # Can be either largest or smallest
+    #packages:
+    kernel:
+        package: linux-generic
+    keyboard:
+        layout: us
+        variant: ''
+    locale: en_US.UTF-8
+    timezone: "Etc/UTC"
+    source: # Specifies the variant of Ubuntu to be installed
+      id: ubuntu-server # For example, the "Extended" installaion of Ubuntu Desktop; NOTE: THIS IS ONLY VALID ON THE UBUNTU DESKTOP ISO! Check the autoinstall configuration reference manual for valid values on other versions of Ubuntu.
+    network: # Provide a Netplan-formatted network configuration; Default is to use DHCP on Ethernet interfaces
+        version: 2 # Defines the version of the netplan configuration, and is required for futureproofing; Currently, this must be set to "2"
+        renderer: networkd
+        ethernets: # Configures wired network cards
+            wired:
+                match:
+                    name: e* # Applies this configuration to ALL wired network cards in the system *To specify a particular interface, replace "e*" with the actual interface name (you can find this with the "ip a" command)
+                dhcp4: true # This is an example of a manual IPv4 configuration (so we can assign our system a static IP)
+                dhcp6: true # We will still automatically obtain the IPv6 configuration
+                addresses: # Sets the IPv4 address of the system (MUST BE IN CIDR FORM)
+                    #- 172.24.144.2/20 # For example, set the IP address to 192.168.0.2; "/24" represents the subnet mask "255.255.255.0"
+                    - 192.168.0.2/24
+                nameservers: # Configures the DNS settings
+                    addresses: # Let's use Cloudflare's DNS servers as an example
+                        - 1.1.1.1
+                        - 8.8.8.8
+                        - 1.0.0.1
+                        - 2606:4700:4700::1111
+                        - 2606:4700:4700::1001
+                routes: # Configures the default gateway
+                    - to: default
+                      via: 192.168.0.1 # Be sure to replace this with your actual gateway address (if different); You can check this on another computer connected to your network
+    apt: # Specifies the apt configuration (used both during the install and on the installed system). Below is the default apt configuration, which you can tweak according to your needs:
+        preserve_sources_list: false
+        mirror-selection: # A list of sources for apt to use (DEFAULT)
+            primary:
+                - country-mirror # Automatically select your country's local mirror; NOTE: geoip must be "true" for this to work
+                - uri: "http://archive.ubuntu.com/ubuntu"
+                  arches: [i386, amd64]
+                - uri: "http://ports.ubuntu.com/ubuntu-ports"
+                  arches: [s390x, arm64, armhf, powerpc, ppc64el, riscv64]
+        fallback: abort # Controls what the installer does when no primary mirror is usable; In this example, the installer will abort the installation when no primary mirror is usable (DEFAULT)
+        geoip: true # DEFAULT (can be either true or false)
+    ssh:
+        install-server: true
+        allow-pw: true
+        authorized-keys: []
+    codecs:
+          install: false
+    drivers:
+        install: false
+    updates: all
+    shutdown: reboot
+    error-commands: # A list of commands to run after the installation has failed.
+        - tar -czf /installer-logs.tar.gz /var/log/installer # For example, collect installer logs in /var/log/installer
+        - journalctl -b > /installer-journal.log # Collect the live system journal too
